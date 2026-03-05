@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: daily-news-app
+    runtime: node
+    plan: starter
+    autoDeploy: false
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start:render
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NEXTAUTH_URL
+        sync: false
+      - key: NEXTAUTH_SECRET
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_CLIENT_SECRET
+        sync: false
+      - key: DISCORD_BOT_TOKEN
+        sync: false
+      - key: DISCORD_BOT_INVITE_URL
+        value: https://discord.com/oauth2/authorize?client_id=1478764158538486022&permissions=2147535936&integration_type=0&scope=bot
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4.1-mini
+      - key: OPENAI_TTS_MODEL
+        value: gpt-4o-mini-tts
+      - key: FIRECRAWL_API_KEY
+        sync: false
+      - key: FIRECRAWL_API_URL
+        value: https://api.firecrawl.dev/v1
+      - key: CRON_SECRET
+        sync: false
+      - key: DATABASE_URL
+        value: file:/data/dev.db
+      - key: TTS_STORAGE_DIR
+        value: /data/tts
+    disk:
+      name: app-data
+      mountPath: /data
+      sizeGB: 10
