@@ -2,10 +2,10 @@ services:
   - type: web
     name: daily-news-app
     runtime: node
-    plan: starter
+    plan: free
     autoDeploy: false
-    buildCommand: npm ci && npm run build
-    startCommand: npm run start:render
+    buildCommand: npm ci && npx prisma db push && npm run build
+    startCommand: npm run start
     envVars:
       - key: NODE_VERSION
         value: 20
@@ -38,10 +38,10 @@ services:
       - key: CRON_SECRET
         sync: false
       - key: DATABASE_URL
-        value: file:/data/dev.db
-      - key: TTS_STORAGE_DIR
-        value: /data/tts
-    disk:
-      name: app-data
-      mountPath: /data
-      sizeGB: 10
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_TTS_BUCKET
+        value: tts

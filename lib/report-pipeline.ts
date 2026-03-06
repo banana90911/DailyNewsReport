@@ -297,7 +297,7 @@ export async function generateReportForSet(setId: string): Promise<{ reportId: s
         title,
         markdown: finalMarkdown,
         ttsText: tts.ttsText,
-        ttsPath: tts.relativePath,
+        ttsPath: tts.ttsPath,
         sourceItems: JSON.stringify(sources),
         status: ReportStatus.COMPLETED,
         completedAt: new Date()

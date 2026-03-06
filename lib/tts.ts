@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { getOpenAIClient } from "@/lib/openai";
+import { getSupabaseAdminClient, getSupabaseTtsBucket, hasSupabaseStorageConfig } from "@/lib/supabase-admin";
 
 export function markdownToTtsFriendlyText(markdown: string): string {
   return markdown
@@ -60,7 +61,7 @@ export async function generateKoreanTtsMp3(params: {
   reportId: string;
   title: string;
   markdown: string;
-}): Promise<{ ttsText: string; relativePath: string }> {
+}): Promise<{ ttsText: string; ttsPath: string }> {
   const client = getOpenAIClient();
   const ttsText = markdownToTtsFriendlyText(`# ${params.title}\n\n${params.markdown}`);
   const chunks = splitTextForTts(ttsText);
@@ -80,6 +81,22 @@ export async function generateKoreanTtsMp3(params: {
 
   const mergedBuffer = Buffer.concat(audioBuffers);
 
+  if (hasSupabaseStorageConfig()) {
+    const bucket = getSupabaseTtsBucket();
+    const objectPath = `reports/${params.reportId}.mp3`;
+    const supabase = getSupabaseAdminClient();
+    const { error } = await supabase.storage.from(bucket).upload(objectPath, mergedBuffer, {
+      contentType: "audio/mpeg",
+      upsert: true
+    });
+
+    if (error) {
+      throw new Error(`Supabase TTS 업로드 실패: ${error.message}`);
+    }
+
+    return { ttsText, ttsPath: `supabase:${bucket}:${objectPath}` };
+  }
+
   const configuredDir = process.env.TTS_STORAGE_DIR?.trim();
   const storageDir = configuredDir
     ? path.isAbsolute(configuredDir)
@@ -91,5 +108,5 @@ export async function generateKoreanTtsMp3(params: {
   await fs.mkdir(path.dirname(absolutePath), { recursive: true });
   await fs.writeFile(absolutePath, mergedBuffer);
 
-  return { ttsText, relativePath: absolutePath };
+  return { ttsText, ttsPath: absolutePath };
 }
