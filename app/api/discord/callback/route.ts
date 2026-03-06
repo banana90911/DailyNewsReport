@@ -10,6 +10,8 @@ type DiscordTokenResponse = {
   refresh_token?: string;
   expires_in?: number;
   scope?: string;
+  error?: string;
+  error_description?: string;
 };
 
 type DiscordUserResponse = {
@@ -65,13 +67,24 @@ export async function GET(request: Request) {
   });
 
   if (!tokenResponse.ok) {
-    return redirectToHomeWithStatus("token_error");
+    const tokenErrorBody = await tokenResponse.text();
+    console.error("Discord OAuth token exchange failed", {
+      status: tokenResponse.status,
+      body: tokenErrorBody,
+      callbackUrl
+    });
+    return redirectToHomeWithStatus(`token_error_${tokenResponse.status}`);
   }
 
   const token = (await tokenResponse.json()) as DiscordTokenResponse;
 
   if (!token.access_token) {
-    return redirectToHomeWithStatus("token_error");
+    console.error("Discord OAuth token payload missing access_token", {
+      callbackUrl,
+      error: token.error,
+      errorDescription: token.error_description
+    });
+    return redirectToHomeWithStatus("token_error_payload");
   }
 
   const userResponse = await fetch(`${DISCORD_API}/users/@me`, {
