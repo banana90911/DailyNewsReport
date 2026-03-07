@@ -59,7 +59,7 @@ export function AudioPlayer({ title, audioUrl }: Props) {
 
     navigator.mediaSession.metadata = new MediaMetadata({
       title,
-      artist: "출근길 리포트"
+      artist: "출근길"
     });
 
     navigator.mediaSession.setActionHandler("play", () => {

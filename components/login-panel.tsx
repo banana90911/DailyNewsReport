@@ -35,7 +35,7 @@ export function LoginPanel({
   return (
     <div className="main-shell" style={{ maxWidth: 520 }}>
       <section className="hero">
-        <h1>출근길 리포트</h1>
+        <h1>출근길</h1>
         <p>Google 로그인 후, 원하는 출근길 예약을 저장하면 자동으로 리포트를 받아볼 수 있습니다.</p>
       </section>
 

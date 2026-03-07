@@ -1,4 +1,5 @@
 import { CategoryScheduleSet, ReportStatus, ScheduleType } from "@prisma/client";
+import { NO_SUB_TOPIC } from "@/lib/categories";
 import { prisma } from "@/lib/db";
 import { sendDiscordReportDm } from "@/lib/discord";
 import { searchLatestNews } from "@/lib/firecrawl";
@@ -100,6 +101,13 @@ function asScheduleInput(set: CategoryScheduleSet): {
   };
 }
 
+function buildReportTitle(params: { mainCategory: string; subCategory: string; aiPerspective: boolean }): string {
+  const withSubTopic = params.subCategory && params.subCategory !== NO_SUB_TOPIC;
+  const topicLabel = withSubTopic ? `${params.mainCategory} / ${params.subCategory}` : params.mainCategory;
+
+  return params.aiPerspective ? `[AI 관점] ${topicLabel} 리포트` : `${topicLabel} 리포트`;
+}
+
 export async function generateReportForSet(setId: string): Promise<{ reportId: string }> {
   const set = await prisma.categoryScheduleSet.findUnique({
     where: { id: setId }
@@ -146,7 +154,11 @@ export async function generateReportForSet(setId: string): Promise<{ reportId: s
     data: {
       userId: set.userId,
       setId: set.id,
-      title: `${set.mainCategory}/${set.subCategory} 리포트`,
+      title: buildReportTitle({
+        mainCategory: set.mainCategory,
+        subCategory: set.subCategory,
+        aiPerspective: set.aiPerspective
+      }),
       markdown: "생성 중...",
       ttsText: "",
       sourceItems: "[]",
@@ -238,9 +250,11 @@ export async function generateReportForSet(setId: string): Promise<{ reportId: s
       sectionContents.push(sectionMarkdown);
     }
 
-    const title = set.aiPerspective
-      ? `[AI 관점] ${set.mainCategory} / ${set.subCategory} 출근길 리포트`
-      : `${set.mainCategory} / ${set.subCategory} 출근길 리포트`;
+    const title = buildReportTitle({
+      mainCategory: set.mainCategory,
+      subCategory: set.subCategory,
+      aiPerspective: set.aiPerspective
+    });
 
     const finalMarkdown = await generateText({
       system: set.aiPerspective

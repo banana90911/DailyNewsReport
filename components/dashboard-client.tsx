@@ -15,7 +15,7 @@ type ScheduleSetItem = {
   id: string;
   mainCategory: string;
   subCategory: string;
-  scheduleType: "DAILY" | "WEEKLY" | "AMPM" | "HOURLY";
+  scheduleType: "DAILY" | "WEEKLY" | "WEEKDAY" | "WEEKEND" | "AMPM" | "HOURLY";
   sendToDiscord: boolean;
   aiPerspective: boolean;
   summary: string;
@@ -44,7 +44,7 @@ type Props = {
   reports: ReportItem[];
 };
 
-type ScheduleType = "DAILY" | "WEEKLY";
+type ScheduleType = "DAILY" | "WEEKLY" | "WEEKDAY" | "WEEKEND";
 type Meridiem = "AM" | "PM";
 
 const WEEKDAY_OPTIONS = [
@@ -99,7 +99,7 @@ function toDiscordStatusMessage(status: string): string {
 
 export function DashboardClient(props: Props) {
   const [sets, setSets] = useState(props.sets);
-  const [reports] = useState(props.reports);
+  const [reports, setReports] = useState(props.reports);
   const [saving, setSaving] = useState(false);
   const [runningSetId, setRunningSetId] = useState<string | null>(null);
   const [errorText, setErrorText] = useState("");
@@ -206,7 +206,7 @@ export function DashboardClient(props: Props) {
 
       const payload = await response.json();
       if (!response.ok) {
-        throw new Error(payload.message || "지금 실행에 실패했습니다.");
+        throw new Error(payload.message || "지금 생성에 실패했습니다.");
       }
 
       window.location.href = `/reports/${payload.reportId}`;
@@ -216,11 +216,32 @@ export function DashboardClient(props: Props) {
     }
   }
 
+  async function handleDeleteReport(reportId: string) {
+    if (!window.confirm("이 리포트를 제거할까요?")) {
+      return;
+    }
+
+    const response = await fetch(`/api/reports/${reportId}`, {
+      method: "DELETE"
+    });
+
+    if (!response.ok) {
+      const payload = await response.json();
+      setErrorText(payload.message || "리포트 제거에 실패했습니다.");
+      return;
+    }
+
+    setReports((prev) => prev.filter((item) => item.id !== reportId));
+  }
+
   return (
     <main className="main-shell">
       <section className="hero">
-        <h1>출근길 리포트</h1>
-        <p>{props.userName || "사용자"} 님의 출근길 예약을 저장하고, 일정에 맞춰 한국어 분석 리포트와 TTS를 받으세요.</p>
+        <h1>출근길</h1>
+        <p>
+          {props.userName || "사용자"} 님의 출근길은 무엇으로 채우고 싶으신가요? 주제와 일정을 선택해주세요. 간단한 리포트를
+          생성해드리며 읽거나 라디오처럼 들을수도 있어요.
+        </p>
         <p className="item-meta">{props.userEmail}</p>
         <div className={`status-badge ${props.discordLinked ? "on" : "off"}`}>
           {props.discordLinked ? "Discord 연결됨 ✅" : "Discord 미연결"}
@@ -308,13 +329,16 @@ export function DashboardClient(props: Props) {
                 <span>{aiPerspective ? "ON" : "OFF"}</span>
               </label>
               {aiPerspective ? (
-                <p className="item-meta">선택한 주제를 AI의 상상/사고실험 관점으로 해석한 리포트를 생성합니다.</p>
+                <>
+                  <p className="item-meta">선택한 주제를 AI의 상상/사고실험 관점으로 해석한 리포트를 생성합니다.</p>
+                  <p className="item-meta">AI는 이 주제를 어떻게 바라볼까요?</p>
+                </>
               ) : null}
             </div>
 
             <div className="form-row full">
-              <label>주기</label>
-              <div className="segmented" role="group" aria-label="주기 선택">
+              <label>일정</label>
+              <div className="segmented" role="group" aria-label="일정 선택">
                 <button
                   className={`seg-btn ${scheduleType === "DAILY" ? "active" : ""}`}
                   onClick={() => setScheduleType("DAILY")}
@@ -328,6 +352,20 @@ export function DashboardClient(props: Props) {
                   type="button"
                 >
                   매주
+                </button>
+                <button
+                  className={`seg-btn ${scheduleType === "WEEKDAY" ? "active" : ""}`}
+                  onClick={() => setScheduleType("WEEKDAY")}
+                  type="button"
+                >
+                  주중
+                </button>
+                <button
+                  className={`seg-btn ${scheduleType === "WEEKEND" ? "active" : ""}`}
+                  onClick={() => setScheduleType("WEEKEND")}
+                  type="button"
+                >
+                  주말
                 </button>
               </div>
             </div>
@@ -422,7 +460,7 @@ export function DashboardClient(props: Props) {
 
             <div className="form-row full actions">
               <button className="btn primary" disabled={saving} type="submit">
-                {saving ? "저장 중..." : "출근길 예약 저장"}
+                {saving ? "저장 중..." : "출근길 예약"}
               </button>
             </div>
           </form>
@@ -430,7 +468,7 @@ export function DashboardClient(props: Props) {
 
         <div style={{ display: "grid", gap: 16 }}>
           <article className="card">
-            <h2>저장된 출근길 예약 ({sets.length})</h2>
+            <h2>출근길 일정 ({sets.length})</h2>
             <div className="set-list">
               {sets.length === 0 ? <p className="item-meta">아직 저장된 예약이 없습니다.</p> : null}
               {sets.map((set) => (
@@ -445,7 +483,7 @@ export function DashboardClient(props: Props) {
                       onClick={() => handleRunNow(set.id)}
                       type="button"
                     >
-                      {runningSetId === set.id ? "실행 중..." : "지금 실행"}
+                      {runningSetId === set.id ? "생성 중..." : "지금 생성"}
                     </button>
                     <button className="btn secondary" onClick={() => handleDeleteSet(set.id)} type="button">
                       제거
@@ -470,6 +508,9 @@ export function DashboardClient(props: Props) {
                     <Link className="btn primary" href={`/reports/${report.id}`}>
                       열람
                     </Link>
+                    <button className="btn secondary" onClick={() => handleDeleteReport(report.id)} type="button">
+                      제거
+                    </button>
                   </div>
                 </div>
               ))}

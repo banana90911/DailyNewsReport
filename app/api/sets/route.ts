@@ -11,7 +11,7 @@ const createSetSchema = z.object({
   mainCustom: z.string().optional(),
   subCategory: z.string().optional(),
   subCustom: z.string().optional(),
-  scheduleType: z.enum(["DAILY", "WEEKLY"]),
+  scheduleType: z.enum(["DAILY", "WEEKLY", "WEEKDAY", "WEEKEND"]),
   timezone: z.string().min(1),
   dayOfWeek: z.number().int().min(0).max(6).nullable().optional(),
   hour: z.number().int().min(0).max(23).nullable().optional(),

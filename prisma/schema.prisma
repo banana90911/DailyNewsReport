@@ -10,6 +10,8 @@ datasource db {
 enum ScheduleType {
   DAILY
   WEEKLY
+  WEEKDAY
+  WEEKEND
   AMPM
   HOURLY
 }

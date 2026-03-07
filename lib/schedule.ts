@@ -38,6 +38,12 @@ export function validateScheduleInput(input: ScheduleInput): void {
     }
   }
 
+  if (input.scheduleType === "WEEKDAY" || input.scheduleType === "WEEKEND") {
+    if (input.hour == null || input.hour < 0 || input.hour > 23) {
+      throw new Error("주중/주말 주기는 0~23시를 지정해야 합니다.");
+    }
+  }
+
   if (input.scheduleType === "AMPM") {
     if (input.morningHour == null || input.morningHour < 0 || input.morningHour > 11) {
       throw new Error("오전 시간은 0~11시여야 합니다.");
@@ -64,6 +70,14 @@ export function buildScheduleText(input: ScheduleInput): string {
   if (input.scheduleType === "WEEKLY") {
     const dayLabel = DAY_LABELS[input.dayOfWeek ?? 1] ?? "월";
     return `매주 ${dayLabel}요일 ${formatHourMinute(input.hour ?? 8, minute)}`;
+  }
+
+  if (input.scheduleType === "WEEKDAY") {
+    return `주중 ${formatHourMinute(input.hour ?? 8, minute)}`;
+  }
+
+  if (input.scheduleType === "WEEKEND") {
+    return `주말 ${formatHourMinute(input.hour ?? 8, minute)}`;
   }
 
   if (input.scheduleType === "AMPM") {
@@ -109,6 +123,24 @@ export function computeNextRun(input: ScheduleInput, fromDate: Date = new Date()
     }
 
     return candidate.toJSDate();
+  }
+
+  if (input.scheduleType === "WEEKDAY" || input.scheduleType === "WEEKEND") {
+    const targetHour = input.hour ?? 8;
+    const isTargetDay = (weekday: number) =>
+      input.scheduleType === "WEEKDAY" ? weekday >= 1 && weekday <= 5 : weekday >= 6 && weekday <= 7;
+
+    for (let i = 0; i <= 14; i += 1) {
+      const candidate = now.plus({ days: i }).set({
+        hour: targetHour,
+        minute,
+        second: 0,
+        millisecond: 0
+      });
+      if (isTargetDay(candidate.weekday) && candidate > now) {
+        return candidate.toJSDate();
+      }
+    }
   }
 
   if (input.scheduleType === "AMPM") {
