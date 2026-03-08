@@ -90,6 +90,7 @@ function toDiscordStatusMessage(params: {
   const map: Record<string, string> = {
     connected: "Discord 계정 연결이 완료되었습니다.",
     denied: "Discord 권한 승인이 취소되었습니다.",
+    connect_cooldown: "Discord 재시도 대기 시간입니다. 잠시 후 다시 시도해 주세요.",
     invalid_state: "Discord 연결 검증에 실패했습니다. 다시 시도해 주세요.",
     token_error: "Discord 토큰 발급에 실패했습니다.",
     token_error_400: "Discord 토큰 발급에 실패했습니다. Redirect URI 또는 Client ID/Secret을 확인해 주세요. (400)",
@@ -105,7 +106,7 @@ function toDiscordStatusMessage(params: {
 
   const base = map[params.status] || "";
 
-  if (params.status !== "token_error_429" || !base) {
+  if ((params.status !== "token_error_429" && params.status !== "connect_cooldown") || !base) {
     return base;
   }
 
@@ -137,7 +138,7 @@ function toDiscordRateLimitDebugText(params: {
   rateLimitGlobal: boolean | null;
   rateLimitBucket: string | null;
 }): string {
-  if (params.status !== "token_error_429") {
+  if (params.status !== "token_error_429" && params.status !== "connect_cooldown") {
     return "";
   }
 
@@ -204,6 +205,8 @@ export function DashboardClient(props: Props) {
     rateLimitGlobal: props.discordRateLimitGlobal,
     rateLimitBucket: props.discordRateLimitBucket
   });
+  const discordConnectBlocked =
+    props.discordStatus === "token_error_429" || props.discordStatus === "connect_cooldown";
 
   async function handleCreateSet(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -515,9 +518,15 @@ export function DashboardClient(props: Props) {
                   <p className="item-meta">Discord Redirect URI 등록값: {props.discordCallbackUri}</p>
                   <div className="actions">
                     {props.discordOAuthEnabled ? (
-                      <a className="btn secondary" href="/api/discord/connect">
-                        Discord 계정 연결
-                      </a>
+                      discordConnectBlocked ? (
+                        <button className="btn secondary" type="button" disabled>
+                          Discord 계정 연결
+                        </button>
+                      ) : (
+                        <a className="btn secondary" href="/api/discord/connect">
+                          Discord 계정 연결
+                        </a>
+                      )
                     ) : (
                       <a className="btn secondary" href={props.discordInviteUrl} target="_blank" rel="noreferrer">
                         Discord 봇 초대 링크 열기

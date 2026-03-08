@@ -1,8 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getDiscordCallbackUrl, verifyDiscordOAuthState } from "@/lib/discord-oauth";
 
 const DISCORD_API = "https://discord.com/api/v10";
+const DISCORD_OAUTH_STATE_COOKIE = "discord_oauth_state";
+const DISCORD_OAUTH_COOLDOWN_COOKIE = "discord_oauth_cooldown_until";
 
 type DiscordTokenResponse = {
   access_token: string;
@@ -48,7 +50,11 @@ function extractRateLimitMeta(response: Response, payload: Record<string, unknow
   };
 }
 
-function redirectToHomeWithStatus(status: string, meta?: DiscordRateLimitMeta): NextResponse {
+function redirectToHomeWithStatus(
+  status: string,
+  meta?: DiscordRateLimitMeta,
+  options?: { setCooldown?: boolean }
+): NextResponse {
   const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
   const url = new URL("/", baseUrl);
 
@@ -70,10 +76,36 @@ function redirectToHomeWithStatus(status: string, meta?: DiscordRateLimitMeta): 
     url.searchParams.set("discord_bucket", meta.bucket.slice(0, 80));
   }
 
-  return NextResponse.redirect(url);
+  const response = NextResponse.redirect(url);
+
+  response.cookies.set(DISCORD_OAUTH_STATE_COOKIE, "", {
+    maxAge: 0,
+    path: "/"
+  });
+
+  if (options?.setCooldown && meta?.retryAfterSeconds && Number.isFinite(meta.retryAfterSeconds)) {
+    const retryAfter = Math.max(1, Math.ceil(meta.retryAfterSeconds));
+    const cooldownUntil = Math.floor(Date.now() / 1000) + retryAfter;
+    response.cookies.set(DISCORD_OAUTH_COOLDOWN_COOKIE, String(cooldownUntil), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: Math.min(retryAfter + 60, 60 * 60 * 24),
+      path: "/"
+    });
+  }
+
+  if (status === "connected") {
+    response.cookies.set(DISCORD_OAUTH_COOLDOWN_COOKIE, "", {
+      maxAge: 0,
+      path: "/"
+    });
+  }
+
+  return response;
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
@@ -88,7 +120,9 @@ export async function GET(request: Request) {
   }
 
   const verified = verifyDiscordOAuthState(state);
-  if (!verified) {
+  const expectedState = request.cookies.get(DISCORD_OAUTH_STATE_COOKIE)?.value;
+
+  if (!verified || !state || !expectedState || expectedState !== state) {
     return redirectToHomeWithStatus("invalid_state");
   }
 
@@ -139,7 +173,9 @@ export async function GET(request: Request) {
       rateLimitMeta,
       callbackUrl
     });
-    return redirectToHomeWithStatus(`token_error_${tokenResponse.status}`, rateLimitMeta);
+    return redirectToHomeWithStatus(`token_error_${tokenResponse.status}`, rateLimitMeta, {
+      setCooldown: tokenResponse.status === 429
+    });
   }
 
   const token = (await tokenResponse.json()) as DiscordTokenResponse;
