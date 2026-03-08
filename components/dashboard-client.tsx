@@ -28,6 +28,7 @@ type ReportItem = {
   title: string;
   status: "PENDING" | "COMPLETED" | "FAILED";
   createdAt: string;
+  errorMessage: string | null;
 };
 
 type Props = {
@@ -648,6 +649,9 @@ export function DashboardClient(props: Props) {
                   <p className="item-meta">
                     상태: {report.status} | 생성: {toHumanDate(report.createdAt)}
                   </p>
+                  {report.errorMessage?.includes("Discord 전송 실패") ? (
+                    <p className="notice">{report.errorMessage}</p>
+                  ) : null}
                   <div className="item-actions">
                     <Link className="btn primary" href={`/reports/${report.id}`}>
                       열람

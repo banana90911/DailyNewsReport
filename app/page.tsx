@@ -50,7 +50,8 @@ export default async function HomePage({
         id: true,
         title: true,
         status: true,
-        createdAt: true
+        createdAt: true,
+        errorMessage: true
       }
     }),
     prisma.account.findFirst({

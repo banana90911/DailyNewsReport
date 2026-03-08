@@ -338,10 +338,18 @@ export async function generateReportForSet(setId: string): Promise<{ reportId: s
           ttsUrl: `${baseUrl}/api/reports/${report.id}/tts`
         });
       } catch (discordError) {
+        const discordErrorText = discordError instanceof Error ? discordError.message : String(discordError);
+        console.error("Discord report delivery failed", {
+          setId: set.id,
+          reportId: report.id,
+          userId: set.userId,
+          error: discordErrorText
+        });
+
         await prisma.report.update({
           where: { id: report.id },
           data: {
-            errorMessage: `Discord 전송 실패: ${discordError instanceof Error ? discordError.message : String(discordError)}`
+            errorMessage: `Discord 전송 실패: ${discordErrorText}`
           }
         });
       }

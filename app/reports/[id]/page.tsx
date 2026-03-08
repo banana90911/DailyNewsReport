@@ -67,7 +67,7 @@ export default async function ReportPage({ params }: { params: { id: string } })
       </section>
 
       <section className="card" style={{ marginTop: 14 }}>
-        {report.status === "FAILED" ? <p className="notice">{report.errorMessage || "리포트 생성 실패"}</p> : null}
+        {report.errorMessage ? <p className="notice">{report.errorMessage}</p> : null}
         <article className="markdown">
           <ReactMarkdown>{report.markdown}</ReactMarkdown>
         </article>
