@@ -18,9 +18,59 @@ type DiscordUserResponse = {
   id: string;
 };
 
-function redirectToHomeWithStatus(status: string): NextResponse {
+type DiscordRateLimitMeta = {
+  retryAfterSeconds?: number;
+  scope?: string;
+  global?: boolean;
+  bucket?: string;
+};
+
+function toFiniteNumberOrNull(value: string | number | null | undefined): number | null {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function extractRateLimitMeta(response: Response, payload: Record<string, unknown> | null): DiscordRateLimitMeta {
+  const retryAfterHeader = toFiniteNumberOrNull(response.headers.get("retry-after"));
+  const resetAfterHeader = toFiniteNumberOrNull(response.headers.get("x-ratelimit-reset-after"));
+  const retryAfterBody = toFiniteNumberOrNull(payload?.retry_after as string | number | null | undefined);
+  const scope = response.headers.get("x-ratelimit-scope") || undefined;
+  const globalHeader = response.headers.get("x-ratelimit-global");
+  const globalFromHeader = globalHeader ? globalHeader.toLowerCase() === "true" : null;
+  const globalFromBody = typeof payload?.global === "boolean" ? (payload.global as boolean) : null;
+  const bucket = response.headers.get("x-ratelimit-bucket") || undefined;
+
+  return {
+    retryAfterSeconds: retryAfterHeader ?? resetAfterHeader ?? retryAfterBody ?? undefined,
+    scope,
+    global: globalFromHeader ?? globalFromBody ?? undefined,
+    bucket
+  };
+}
+
+function redirectToHomeWithStatus(status: string, meta?: DiscordRateLimitMeta): NextResponse {
   const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-  return NextResponse.redirect(new URL(`/?discord=${status}`, baseUrl));
+  const url = new URL("/", baseUrl);
+
+  url.searchParams.set("discord", status);
+
+  if (meta?.retryAfterSeconds != null && Number.isFinite(meta.retryAfterSeconds)) {
+    url.searchParams.set("discord_retry_after", String(Math.ceil(meta.retryAfterSeconds)));
+  }
+
+  if (meta?.scope) {
+    url.searchParams.set("discord_scope", meta.scope);
+  }
+
+  if (typeof meta?.global === "boolean") {
+    url.searchParams.set("discord_global", meta.global ? "1" : "0");
+  }
+
+  if (meta?.bucket) {
+    url.searchParams.set("discord_bucket", meta.bucket.slice(0, 80));
+  }
+
+  return NextResponse.redirect(url);
 }
 
 export async function GET(request: Request) {
@@ -68,12 +118,28 @@ export async function GET(request: Request) {
 
   if (!tokenResponse.ok) {
     const tokenErrorBody = await tokenResponse.text();
+    let tokenErrorPayload: Record<string, unknown> | null = null;
+
+    try {
+      tokenErrorPayload = JSON.parse(tokenErrorBody) as Record<string, unknown>;
+    } catch {
+      tokenErrorPayload = null;
+    }
+
+    const rateLimitMeta = extractRateLimitMeta(tokenResponse, tokenErrorPayload);
+
     console.error("Discord OAuth token exchange failed", {
       status: tokenResponse.status,
       body: tokenErrorBody,
+      retryAfter: tokenResponse.headers.get("retry-after"),
+      rateLimitResetAfter: tokenResponse.headers.get("x-ratelimit-reset-after"),
+      rateLimitScope: tokenResponse.headers.get("x-ratelimit-scope"),
+      rateLimitGlobal: tokenResponse.headers.get("x-ratelimit-global"),
+      rateLimitBucket: tokenResponse.headers.get("x-ratelimit-bucket"),
+      rateLimitMeta,
       callbackUrl
     });
-    return redirectToHomeWithStatus(`token_error_${tokenResponse.status}`);
+    return redirectToHomeWithStatus(`token_error_${tokenResponse.status}`, rateLimitMeta);
   }
 
   const token = (await tokenResponse.json()) as DiscordTokenResponse;

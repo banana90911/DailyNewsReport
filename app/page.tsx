@@ -3,10 +3,25 @@ import { DashboardClient } from "@/components/dashboard-client";
 import { prisma } from "@/lib/db";
 import { getSessionOrNull } from "@/lib/session";
 
+function parseFiniteNumber(value: string | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export default async function HomePage({
   searchParams
 }: {
-  searchParams?: { discord?: string };
+  searchParams?: {
+    discord?: string;
+    discord_retry_after?: string;
+    discord_scope?: string;
+    discord_global?: string;
+    discord_bucket?: string;
+  };
 }) {
   const session = await getSessionOrNull();
 
@@ -57,6 +72,10 @@ export default async function HomePage({
       discordLinked={Boolean(discordAccount)}
       discordAccountId={discordAccount?.providerAccountId || null}
       discordStatus={searchParams?.discord || ""}
+      discordRetryAfterSeconds={parseFiniteNumber(searchParams?.discord_retry_after)}
+      discordRateLimitScope={searchParams?.discord_scope || null}
+      discordRateLimitGlobal={searchParams?.discord_global === "1" ? true : searchParams?.discord_global === "0" ? false : null}
+      discordRateLimitBucket={searchParams?.discord_bucket || null}
       discordCallbackUri={`${(process.env.NEXTAUTH_URL || "http://localhost:3000").replace(/\/$/, "")}/api/discord/callback`}
       discordOAuthEnabled={Boolean(process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET)}
       discordInviteUrl={process.env.DISCORD_BOT_INVITE_URL || "https://discord.com"}

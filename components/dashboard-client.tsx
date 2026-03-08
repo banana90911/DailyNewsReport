@@ -37,6 +37,10 @@ type Props = {
   discordLinked: boolean;
   discordAccountId: string | null;
   discordStatus: string;
+  discordRetryAfterSeconds: number | null;
+  discordRateLimitScope: string | null;
+  discordRateLimitGlobal: boolean | null;
+  discordRateLimitBucket: string | null;
   discordCallbackUri: string;
   discordOAuthEnabled: boolean;
   discordInviteUrl: string;
@@ -77,7 +81,12 @@ function to24Hour(hour12: number, meridiem: Meridiem): number {
   return normalized === 12 ? 12 : normalized + 12;
 }
 
-function toDiscordStatusMessage(status: string): string {
+function toDiscordStatusMessage(params: {
+  status: string;
+  retryAfterSeconds: number | null;
+  rateLimitScope: string | null;
+  rateLimitGlobal: boolean | null;
+}): string {
   const map: Record<string, string> = {
     connected: "Discord 계정 연결이 완료되었습니다.",
     denied: "Discord 권한 승인이 취소되었습니다.",
@@ -94,7 +103,63 @@ function toDiscordStatusMessage(status: string): string {
     missing_code: "Discord 인증 코드가 전달되지 않았습니다."
   };
 
-  return map[status] || "";
+  const base = map[params.status] || "";
+
+  if (params.status !== "token_error_429" || !base) {
+    return base;
+  }
+
+  const details: string[] = [];
+
+  if (params.retryAfterSeconds != null && Number.isFinite(params.retryAfterSeconds)) {
+    details.push(`약 ${Math.ceil(params.retryAfterSeconds)}초 후 재시도`);
+  }
+
+  if (params.rateLimitScope) {
+    details.push(`scope=${params.rateLimitScope}`);
+  }
+
+  if (typeof params.rateLimitGlobal === "boolean") {
+    details.push(`global=${params.rateLimitGlobal ? "true" : "false"}`);
+  }
+
+  if (details.length === 0) {
+    return base;
+  }
+
+  return `${base} (${details.join(", ")})`;
+}
+
+function toDiscordRateLimitDebugText(params: {
+  status: string;
+  retryAfterSeconds: number | null;
+  rateLimitScope: string | null;
+  rateLimitGlobal: boolean | null;
+  rateLimitBucket: string | null;
+}): string {
+  if (params.status !== "token_error_429") {
+    return "";
+  }
+
+  const parts: string[] = [];
+
+  if (params.retryAfterSeconds != null && Number.isFinite(params.retryAfterSeconds)) {
+    parts.push(`Retry-After=${Math.ceil(params.retryAfterSeconds)}s`);
+  }
+
+  if (params.rateLimitScope) {
+    parts.push(`X-RateLimit-Scope=${params.rateLimitScope}`);
+  }
+
+  if (typeof params.rateLimitGlobal === "boolean") {
+    parts.push(`X-RateLimit-Global=${params.rateLimitGlobal ? "true" : "false"}`);
+  }
+
+  if (params.rateLimitBucket) {
+    parts.push(`X-RateLimit-Bucket=${params.rateLimitBucket}`);
+  }
+
+  return parts.length > 0 ? `Discord 제한 진단: ${parts.join(" | ")}` : "";
 }
 
 export function DashboardClient(props: Props) {
@@ -126,7 +191,19 @@ export function DashboardClient(props: Props) {
       ? subCustom || "직접 입력"
       : subCategory;
   const helpText = buildCategoryHelpText(effectiveMain, effectiveSub);
-  const discordStatusMessage = toDiscordStatusMessage(props.discordStatus);
+  const discordStatusMessage = toDiscordStatusMessage({
+    status: props.discordStatus,
+    retryAfterSeconds: props.discordRetryAfterSeconds,
+    rateLimitScope: props.discordRateLimitScope,
+    rateLimitGlobal: props.discordRateLimitGlobal
+  });
+  const discordRateLimitDebugText = toDiscordRateLimitDebugText({
+    status: props.discordStatus,
+    retryAfterSeconds: props.discordRetryAfterSeconds,
+    rateLimitScope: props.discordRateLimitScope,
+    rateLimitGlobal: props.discordRateLimitGlobal,
+    rateLimitBucket: props.discordRateLimitBucket
+  });
 
   async function handleCreateSet(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -250,6 +327,7 @@ export function DashboardClient(props: Props) {
           <p className="item-meta">Discord ID: {props.discordAccountId}</p>
         ) : null}
         {discordStatusMessage ? <p className="notice">{discordStatusMessage}</p> : null}
+        {discordRateLimitDebugText ? <p className="item-meta">{discordRateLimitDebugText}</p> : null}
         <div className="actions">
           <button className="btn secondary" onClick={() => signOut({ callbackUrl: "/login" })}>
             로그아웃
