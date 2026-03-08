@@ -5,6 +5,7 @@ export type ScheduleInput = {
   scheduleType: ScheduleType;
   timezone: string;
   dayOfWeek?: number | null;
+  customDays?: number[] | null;
   hour?: number | null;
   minute?: number | null;
   intervalHours?: number | null;
@@ -13,6 +14,7 @@ export type ScheduleInput = {
 };
 
 const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+const CUSTOM_DAY_SORT_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 function toDateTime(date: Date, timezone: string): DateTime {
   return DateTime.fromJSDate(date, { zone: timezone });
@@ -41,6 +43,16 @@ export function validateScheduleInput(input: ScheduleInput): void {
   if (input.scheduleType === "WEEKDAY" || input.scheduleType === "WEEKEND") {
     if (input.hour == null || input.hour < 0 || input.hour > 23) {
       throw new Error("주중/주말 주기는 0~23시를 지정해야 합니다.");
+    }
+  }
+
+  if (input.scheduleType === "CUSTOM") {
+    const days = Array.from(new Set((input.customDays ?? []).filter((day) => day >= 0 && day <= 6)));
+    if (days.length === 0) {
+      throw new Error("직접 선택 주기는 최소 1개 이상의 요일을 지정해야 합니다.");
+    }
+    if (input.hour == null || input.hour < 0 || input.hour > 23) {
+      throw new Error("직접 선택 주기는 0~23시를 지정해야 합니다.");
     }
   }
 
@@ -78,6 +90,14 @@ export function buildScheduleText(input: ScheduleInput): string {
 
   if (input.scheduleType === "WEEKEND") {
     return `주말 ${formatHourMinute(input.hour ?? 8, minute)}`;
+  }
+
+  if (input.scheduleType === "CUSTOM") {
+    const normalizedDays = Array.from(new Set((input.customDays ?? []).filter((day) => day >= 0 && day <= 6))).sort(
+      (a, b) => CUSTOM_DAY_SORT_ORDER.indexOf(a) - CUSTOM_DAY_SORT_ORDER.indexOf(b)
+    );
+    const label = normalizedDays.map((day) => DAY_LABELS[day]).join(", ");
+    return `직접 선택 (${label}) ${formatHourMinute(input.hour ?? 8, minute)}`;
   }
 
   if (input.scheduleType === "AMPM") {
@@ -138,6 +158,27 @@ export function computeNextRun(input: ScheduleInput, fromDate: Date = new Date()
         millisecond: 0
       });
       if (isTargetDay(candidate.weekday) && candidate > now) {
+        return candidate.toJSDate();
+      }
+    }
+  }
+
+  if (input.scheduleType === "CUSTOM") {
+    const targetHour = input.hour ?? 8;
+    const selectedDays = new Set(
+      Array.from(new Set((input.customDays ?? []).filter((day) => day >= 0 && day <= 6))).map(
+        (day) => ((day + 6) % 7) + 1
+      )
+    );
+
+    for (let i = 0; i <= 14; i += 1) {
+      const candidate = now.plus({ days: i }).set({
+        hour: targetHour,
+        minute,
+        second: 0,
+        millisecond: 0
+      });
+      if (selectedDays.has(candidate.weekday) && candidate > now) {
         return candidate.toJSDate();
       }
     }

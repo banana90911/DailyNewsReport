@@ -15,7 +15,7 @@ type ScheduleSetItem = {
   id: string;
   mainCategory: string;
   subCategory: string;
-  scheduleType: "DAILY" | "WEEKLY" | "WEEKDAY" | "WEEKEND" | "AMPM" | "HOURLY";
+  scheduleType: "DAILY" | "WEEKLY" | "WEEKDAY" | "WEEKEND" | "CUSTOM" | "AMPM" | "HOURLY";
   sendToDiscord: boolean;
   aiPerspective: boolean;
   summary: string;
@@ -48,7 +48,7 @@ type Props = {
   reports: ReportItem[];
 };
 
-type ScheduleType = "DAILY" | "WEEKLY" | "WEEKDAY" | "WEEKEND";
+type ScheduleType = "DAILY" | "WEEKLY" | "WEEKDAY" | "WEEKEND" | "CUSTOM";
 type Meridiem = "AM" | "PM";
 
 const WEEKDAY_OPTIONS = [
@@ -59,6 +59,16 @@ const WEEKDAY_OPTIONS = [
   { label: "목요일", value: 4 },
   { label: "금요일", value: 5 },
   { label: "토요일", value: 6 }
+];
+
+const DIRECT_DAY_OPTIONS = [
+  { label: "월", value: 1 },
+  { label: "화", value: 2 },
+  { label: "수", value: 3 },
+  { label: "목", value: 4 },
+  { label: "금", value: 5 },
+  { label: "토", value: 6 },
+  { label: "일", value: 0 }
 ];
 
 function toHumanDate(value: string | null): string {
@@ -163,6 +173,11 @@ function toDiscordRateLimitDebugText(params: {
   return parts.length > 0 ? `Discord 제한 진단: ${parts.join(" | ")}` : "";
 }
 
+function sortDirectDays(days: number[]): number[] {
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  return Array.from(new Set(days)).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+}
+
 export function DashboardClient(props: Props) {
   const [sets, setSets] = useState(props.sets);
   const [reports, setReports] = useState(props.reports);
@@ -176,6 +191,7 @@ export function DashboardClient(props: Props) {
   const [subCustom, setSubCustom] = useState("");
   const [scheduleType, setScheduleType] = useState<ScheduleType>("DAILY");
   const [dayOfWeek, setDayOfWeek] = useState(1);
+  const [directDays, setDirectDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [meridiem, setMeridiem] = useState<Meridiem>("AM");
   const [hour12, setHour12] = useState(8);
   const [sendToDiscord, setSendToDiscord] = useState(false);
@@ -211,6 +227,12 @@ export function DashboardClient(props: Props) {
   async function handleCreateSet(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrorText("");
+
+    if (scheduleType === "CUSTOM" && directDays.length === 0) {
+      setErrorText("직접 선택에서는 최소 1개 이상의 요일을 선택해 주세요.");
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -222,6 +244,7 @@ export function DashboardClient(props: Props) {
         scheduleType,
         timezone,
         dayOfWeek: scheduleType === "WEEKLY" ? dayOfWeek : null,
+        customDays: scheduleType === "CUSTOM" ? sortDirectDays(directDays) : [],
         hour: to24Hour(hour12, meridiem),
         minute: 0,
         sendToDiscord: props.discordLinked ? sendToDiscord : false,
@@ -312,6 +335,15 @@ export function DashboardClient(props: Props) {
     }
 
     setReports((prev) => prev.filter((item) => item.id !== reportId));
+  }
+
+  function handleToggleDirectDay(day: number) {
+    setDirectDays((prev) => {
+      if (prev.includes(day)) {
+        return prev.filter((item) => item !== day);
+      }
+      return sortDirectDays([...prev, day]);
+    });
   }
 
   return (
@@ -448,11 +480,18 @@ export function DashboardClient(props: Props) {
                 >
                   주말
                 </button>
+                <button
+                  className={`seg-btn ${scheduleType === "CUSTOM" ? "active" : ""}`}
+                  onClick={() => setScheduleType("CUSTOM")}
+                  type="button"
+                >
+                  직접 선택
+                </button>
               </div>
             </div>
 
             {scheduleType === "WEEKLY" ? (
-              <div className="form-row">
+              <div className="form-row full">
                 <label>요일</label>
                 <select value={dayOfWeek} onChange={(event) => setDayOfWeek(Number(event.target.value))}>
                   {WEEKDAY_OPTIONS.map((day) => (
@@ -461,6 +500,24 @@ export function DashboardClient(props: Props) {
                     </option>
                   ))}
                 </select>
+              </div>
+            ) : null}
+
+            {scheduleType === "CUSTOM" ? (
+              <div className="form-row full">
+                <label>직접 선택</label>
+                <div className="weekday-segment" role="group" aria-label="직접 선택 요일">
+                  {DIRECT_DAY_OPTIONS.map((day) => (
+                    <button
+                      key={day.value}
+                      className={`weekday-btn ${directDays.includes(day.value) ? "active" : ""}`}
+                      onClick={() => handleToggleDirectDay(day.value)}
+                      type="button"
+                    >
+                      {day.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             ) : null}
 

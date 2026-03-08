@@ -12,6 +12,7 @@ enum ScheduleType {
   WEEKLY
   WEEKDAY
   WEEKEND
+  CUSTOM
   AMPM
   HOURLY
 }
@@ -84,6 +85,7 @@ model CategoryScheduleSet {
   scheduleType      ScheduleType
   timezone          String       @default("Asia/Seoul")
   dayOfWeek         Int?
+  customDays        Int[]        @default([])
   hour              Int?
   minute            Int          @default(0)
   intervalHours     Int?

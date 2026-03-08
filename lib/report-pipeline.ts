@@ -83,6 +83,7 @@ function asScheduleInput(set: CategoryScheduleSet): {
   scheduleType: ScheduleType;
   timezone: string;
   dayOfWeek: number | null;
+  customDays: number[];
   hour: number | null;
   minute: number | null;
   intervalHours: number | null;
@@ -93,6 +94,7 @@ function asScheduleInput(set: CategoryScheduleSet): {
     scheduleType: set.scheduleType,
     timezone: set.timezone,
     dayOfWeek: set.dayOfWeek,
+    customDays: set.customDays ?? [],
     hour: set.hour,
     minute: set.minute,
     intervalHours: set.intervalHours,

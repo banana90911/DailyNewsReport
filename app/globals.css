@@ -239,6 +239,33 @@ textarea:focus {
   background: var(--brand);
 }
 
+.weekday-segment {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  width: 100%;
+  border: 1px solid #c8c0b1;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.weekday-btn {
+  border: 0;
+  background: transparent;
+  padding: 10px 0;
+  color: var(--ink-subtle);
+  cursor: pointer;
+}
+
+.weekday-btn + .weekday-btn {
+  border-left: 1px solid #ddd4c6;
+}
+
+.weekday-btn.active {
+  color: #fff;
+  background: var(--brand);
+}
+
 .actions {
   margin-top: 12px;
   display: flex;
