@@ -35,18 +35,29 @@ export function AudioPlayer({ title, audioUrl }: Props) {
     }
 
     const onTime = () => setCurrentTime(audio.currentTime);
-    const onLoaded = () => setDuration(audio.duration || 0);
+    const onLoaded = () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        setDuration(audio.duration);
+      }
+    };
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
 
     audio.addEventListener("timeupdate", onTime);
     audio.addEventListener("loadedmetadata", onLoaded);
+    audio.addEventListener("loadeddata", onLoaded);
+    audio.addEventListener("durationchange", onLoaded);
+    audio.addEventListener("canplay", onLoaded);
     audio.addEventListener("play", onPlay);
     audio.addEventListener("pause", onPause);
+    onLoaded();
 
     return () => {
       audio.removeEventListener("timeupdate", onTime);
       audio.removeEventListener("loadedmetadata", onLoaded);
+      audio.removeEventListener("loadeddata", onLoaded);
+      audio.removeEventListener("durationchange", onLoaded);
+      audio.removeEventListener("canplay", onLoaded);
       audio.removeEventListener("play", onPlay);
       audio.removeEventListener("pause", onPause);
     };

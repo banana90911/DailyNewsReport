@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { signOut } from "next-auth/react";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   buildCategoryHelpText,
   getSubCategoryOptions,
@@ -71,6 +71,14 @@ const DIRECT_DAY_OPTIONS = [
   { label: "토", value: 6 },
   { label: "일", value: 0 }
 ];
+
+const SUB_TOPIC_PLACEHOLDER_MAP: Record<string, string> = {
+  "경제": "기름값 인상",
+  AI: "생성형 AI 기반 상담 지원",
+  "정치": "총선 판세 변화",
+  "사회": "전세사기 대응책",
+  "IT/과학": "제로데이 보안 취약점"
+};
 
 function toHumanDate(value: string | null): string {
   if (!value) {
@@ -179,6 +187,10 @@ function sortDirectDays(days: number[]): number[] {
   return Array.from(new Set(days)).sort((a, b) => order.indexOf(a) - order.indexOf(b));
 }
 
+function getSubTopicPlaceholder(mainCategory: string): string {
+  return `예: ${SUB_TOPIC_PLACEHOLDER_MAP[mainCategory] || "핵심 이슈 분석"}`;
+}
+
 export function DashboardClient(props: Props) {
   const [sets, setSets] = useState(props.sets);
   const [reports, setReports] = useState(props.reports);
@@ -224,6 +236,35 @@ export function DashboardClient(props: Props) {
   });
   const discordConnectBlocked =
     props.discordStatus === "token_error_429" || props.discordStatus === "connect_cooldown";
+  const subTopicPlaceholder = getSubTopicPlaceholder(mainCategory);
+
+  const refreshReports = useCallback(async () => {
+    const response = await fetch("/api/reports", {
+      method: "GET",
+      cache: "no-store"
+    });
+
+    if (!response.ok) {
+      return;
+    }
+
+    const payload = (await response.json()) as { reports?: ReportItem[] };
+    if (!Array.isArray(payload.reports)) {
+      return;
+    }
+
+    setReports(payload.reports);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void refreshReports();
+    }, 5000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [refreshReports]);
 
   async function handleCreateSet(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -312,10 +353,12 @@ export function DashboardClient(props: Props) {
       if (!response.ok) {
         throw new Error(payload.message || "지금 생성에 실패했습니다.");
       }
-
-      window.location.href = `/reports/${payload.reportId}`;
+      setTimeout(() => {
+        void refreshReports();
+      }, 800);
     } catch (error) {
       setErrorText(error instanceof Error ? error.message : "실행 실패");
+    } finally {
       setRunningSetId(null);
     }
   }
@@ -352,8 +395,10 @@ export function DashboardClient(props: Props) {
       <section className="hero">
         <h1>출근길</h1>
         <p>
-          {props.userName || "사용자"} 님의 출근길은 무엇으로 채우고 싶으신가요? 주제와 일정을 선택해주세요. 간단한 리포트를
-          생성해드리며 읽거나 라디오처럼 들을수도 있어요.
+          {props.userName || "사용자"} 님의 출근길은 무엇으로 채우고 싶으신가요? 주제와 일정을 선택해주세요.
+          <br />
+          간단한 리포트를 생성하여 읽거나 라디오처럼 들을수도 있어요.
+          <br />※ 듣기 전용의 별도의 스크립트가 생성됩니다.
         </p>
         <p className="item-meta">{props.userEmail}</p>
         <div className={`status-badge ${props.discordLinked ? "on" : "off"}`}>
@@ -404,7 +449,11 @@ export function DashboardClient(props: Props) {
             {mainCategory === "직접 입력" ? (
               <div className="form-row">
                 <label>주제 직접 입력</label>
-                <input value={mainCustom} onChange={(event) => setMainCustom(event.target.value)} placeholder="예: 테크 정책" />
+                <input
+                  value={mainCustom}
+                  onChange={(event) => setMainCustom(event.target.value)}
+                  placeholder="예: 비트코인 떡락 이유"
+                />
               </div>
             ) : null}
 
@@ -424,7 +473,7 @@ export function DashboardClient(props: Props) {
             {!isSubTopicDisabled && subCategory === "직접 입력" ? (
               <div className="form-row">
                 <label>소주제 직접 입력</label>
-                <input value={subCustom} onChange={(event) => setSubCustom(event.target.value)} placeholder="예: 반도체" />
+                <input value={subCustom} onChange={(event) => setSubCustom(event.target.value)} placeholder={subTopicPlaceholder} />
               </div>
             ) : null}
 
@@ -613,8 +662,13 @@ export function DashboardClient(props: Props) {
 
         <div style={{ display: "grid", gap: 16 }}>
           <article className="card">
-            <h2>출근길 일정 ({sets.length})</h2>
-            <div className="set-list">
+            <div className="section-head">
+              <h2 className="section-title">
+                <span>출근길 일정</span>
+                <span className="section-count">({sets.length})</span>
+              </h2>
+            </div>
+            <div className={`set-list ${sets.length > 3 ? "scroll-list" : ""}`}>
               {sets.length === 0 ? <p className="item-meta">아직 저장된 예약이 없습니다.</p> : null}
               {sets.map((set) => (
                 <div className="set-item" key={set.id}>
@@ -640,22 +694,36 @@ export function DashboardClient(props: Props) {
           </article>
 
           <article className="card">
-            <h2>최근 리포트 ({reports.length})</h2>
-            <div className="report-list">
+            <div className="section-head">
+              <h2 className="section-title">
+                <span>최근 리포트</span>
+                <span className="section-count">({reports.length})</span>
+              </h2>
+              <p className="section-note">※ 생성 10일 후 자동으로 만료됩니다.</p>
+            </div>
+            <div className={`report-list ${reports.length > 3 ? "scroll-list" : ""}`}>
               {reports.length === 0 ? <p className="item-meta">아직 생성된 리포트가 없습니다.</p> : null}
               {reports.map((report) => (
                 <div className="report-item" key={report.id}>
                   <strong>{report.title}</strong>
                   <p className="item-meta">
-                    상태: {report.status} | 생성: {toHumanDate(report.createdAt)}
+                    상태:{" "}
+                    <span className={report.status === "PENDING" ? "status-text pending" : "status-text"}>{report.status}</span> | 생성:{" "}
+                    {toHumanDate(report.createdAt)}
                   </p>
                   {report.errorMessage?.includes("Discord 전송 실패") ? (
                     <p className="notice">{report.errorMessage}</p>
                   ) : null}
                   <div className="item-actions">
-                    <Link className="btn primary" href={`/reports/${report.id}`}>
-                      열람
-                    </Link>
+                    {report.status === "PENDING" ? (
+                      <button className="btn primary" type="button" disabled>
+                        열람
+                      </button>
+                    ) : (
+                      <Link className="btn primary" href={`/reports/${report.id}`}>
+                        열람
+                      </Link>
+                    )}
                     <button className="btn secondary" onClick={() => handleDeleteReport(report.id)} type="button">
                       제거
                     </button>

@@ -27,13 +27,13 @@ export async function POST(_request: Request, { params }: RouteParams) {
     return NextResponse.json({ message: "출근길 예약을 찾을 수 없습니다." }, { status: 404 });
   }
 
-  try {
-    const result = await generateReportForSet(set.id);
-    return NextResponse.json({ reportId: result.reportId });
-  } catch (error) {
-    return NextResponse.json(
-      { message: error instanceof Error ? error.message : "리포트 실행 실패" },
-      { status: 500 }
-    );
-  }
+  void generateReportForSet(set.id).catch((error) => {
+    console.error("Manual run failed", {
+      setId: set.id,
+      userId: session.user.id,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  });
+
+  return NextResponse.json({ started: true });
 }
