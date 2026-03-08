@@ -329,13 +329,27 @@ export async function generateReportForSet(setId: string): Promise<{ reportId: s
     });
 
     if (set.sendToDiscord) {
+      console.info("Discord report delivery attempt", {
+        setId: set.id,
+        reportId: report.id,
+        userId: set.userId
+      });
+
       try {
         const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-        await sendDiscordReportDm({
+        const delivery = await sendDiscordReportDm({
           appUserId: set.userId,
           reportTitle: title,
           reportUrl: `${baseUrl}/reports/${report.id}`,
           ttsUrl: `${baseUrl}/api/reports/${report.id}/tts`
+        });
+
+        console.info("Discord report delivery success", {
+          setId: set.id,
+          reportId: report.id,
+          userId: set.userId,
+          discordUserId: delivery.discordUserId,
+          channelId: delivery.channelId
         });
       } catch (discordError) {
         const discordErrorText = discordError instanceof Error ? discordError.message : String(discordError);
@@ -353,6 +367,13 @@ export async function generateReportForSet(setId: string): Promise<{ reportId: s
           }
         });
       }
+    } else {
+      console.info("Discord report delivery skipped", {
+        setId: set.id,
+        reportId: report.id,
+        userId: set.userId,
+        reason: "sendToDiscord=false"
+      });
     }
 
     return { reportId: report.id };

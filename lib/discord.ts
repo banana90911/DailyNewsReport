@@ -37,7 +37,7 @@ export async function sendDiscordReportDm(params: {
   reportTitle: string;
   reportUrl: string;
   ttsUrl: string;
-}): Promise<void> {
+}): Promise<{ discordUserId: string; channelId: string }> {
   const discordUserId = await getLinkedDiscordUserId(params.appUserId);
 
   if (!discordUserId) {
@@ -71,4 +71,9 @@ export async function sendDiscordReportDm(params: {
     const text = await messageResponse.text();
     throw new Error(`Discord 메시지 전송 실패: ${messageResponse.status} ${text}`);
   }
+
+  return {
+    discordUserId,
+    channelId: channel.id
+  };
 }
