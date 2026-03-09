@@ -5,10 +5,29 @@ on:
     - cron: "*/15 * * * *"
   workflow_dispatch:
 
+concurrency:
+  group: report-scheduler
+  cancel-in-progress: false
+
 jobs:
   trigger:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
+      - name: Warm up Render service
+        env:
+          SCHEDULER_ENDPOINT: ${{ secrets.SCHEDULER_ENDPOINT }}
+        run: |
+          if [ -z "$SCHEDULER_ENDPOINT" ]; then
+            echo "SCHEDULER_ENDPOINT secret is required"
+            exit 1
+          fi
+
+          BASE_URL="${SCHEDULER_ENDPOINT%/api/scheduler/run}"
+          echo "Warming up: $BASE_URL"
+          curl -sS "$BASE_URL" > /dev/null || true
+          sleep 20
+
       - name: Call scheduler endpoint
         env:
           SCHEDULER_ENDPOINT: ${{ secrets.SCHEDULER_ENDPOINT }}
@@ -19,8 +38,30 @@ jobs:
             exit 1
           fi
 
-          if [ -n "$CRON_SECRET" ]; then
-            curl -sS -X POST "$SCHEDULER_ENDPOINT" -H "x-cron-secret: $CRON_SECRET"
-          else
-            curl -sS -X POST "$SCHEDULER_ENDPOINT"
-          fi
+          for attempt in 1 2 3; do
+            if [ -n "$CRON_SECRET" ]; then
+              http_code=$(curl -sS -o /tmp/scheduler-response.txt -w "%{http_code}" \
+                -X POST "$SCHEDULER_ENDPOINT" \
+                -H "x-cron-secret: $CRON_SECRET" \
+                -H "accept: application/json")
+            else
+              http_code=$(curl -sS -o /tmp/scheduler-response.txt -w "%{http_code}" \
+                -X POST "$SCHEDULER_ENDPOINT" \
+                -H "accept: application/json")
+            fi
+
+            echo "Attempt $attempt HTTP status: $http_code"
+            cat /tmp/scheduler-response.txt || true
+            echo
+
+            if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 3 ]; then
+              sleep 25
+            fi
+          done
+
+          echo "Scheduler endpoint failed after retries."
+          exit 1

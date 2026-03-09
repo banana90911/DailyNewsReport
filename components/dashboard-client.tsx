@@ -92,6 +92,10 @@ function toHumanDate(value: string | null): string {
   });
 }
 
+function normalizeSetSummaryDisplay(summary: string): string {
+  return summary.replace(/\s*직접 선택\s*\(/, " (");
+}
+
 function to24Hour(hour12: number, meridiem: Meridiem): number {
   const normalized = Math.min(12, Math.max(1, hour12));
   if (meridiem === "AM") {
@@ -672,7 +676,7 @@ export function DashboardClient(props: Props) {
               {sets.length === 0 ? <p className="item-meta">아직 저장된 예약이 없습니다.</p> : null}
               {sets.map((set) => (
                 <div className="set-item" key={set.id}>
-                  <strong>{set.summary}</strong>
+                  <strong>{normalizeSetSummaryDisplay(set.summary)}</strong>
                   <p className="item-meta">다음 실행: {toHumanDate(set.nextRunAt)}</p>
                   <p className="item-meta">생성: {toHumanDate(set.createdAt)}</p>
                   <div className="item-actions">

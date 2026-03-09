@@ -97,7 +97,7 @@ export function buildScheduleText(input: ScheduleInput): string {
       (a, b) => CUSTOM_DAY_SORT_ORDER.indexOf(a) - CUSTOM_DAY_SORT_ORDER.indexOf(b)
     );
     const label = normalizedDays.map((day) => DAY_LABELS[day]).join(", ");
-    return `직접 선택 (${label}) ${formatHourMinute(input.hour ?? 8, minute)}`;
+    return `(${label}) ${formatHourMinute(input.hour ?? 8, minute)}`;
   }
 
   if (input.scheduleType === "AMPM") {
