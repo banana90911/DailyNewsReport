@@ -213,6 +213,7 @@ export function DashboardClient(props: Props) {
   const [hour12, setHour12] = useState(8);
   const [sendToDiscord, setSendToDiscord] = useState(false);
   const [aiPerspective, setAiPerspective] = useState(false);
+  const hasReachedSetLimit = sets.length >= 3;
 
   const timezone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Seoul", []);
 
@@ -273,6 +274,11 @@ export function DashboardClient(props: Props) {
   async function handleCreateSet(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrorText("");
+
+    if (hasReachedSetLimit) {
+      setErrorText("출근길 일정은 최대 3개까지 생성할 수 있습니다.");
+      return;
+    }
 
     if (scheduleType === "CUSTOM" && directDays.length === 0) {
       setErrorText("직접 선택에서는 최소 1개 이상의 요일을 선택해 주세요.");
@@ -656,9 +662,15 @@ export function DashboardClient(props: Props) {
               </div>
             ) : null}
 
+            {!errorText && hasReachedSetLimit ? (
+              <div className="form-row full">
+                <p className="notice">출근길 일정은 최대 3개까지 저장할 수 있습니다. 기존 일정을 제거한 뒤 추가해 주세요.</p>
+              </div>
+            ) : null}
+
             <div className="form-row full actions">
-              <button className="btn primary" disabled={saving} type="submit">
-                {saving ? "저장 중..." : "출근길 예약"}
+              <button className="btn primary" disabled={saving || hasReachedSetLimit} type="submit">
+                {saving ? "저장 중..." : hasReachedSetLimit ? "최대 3개 도달" : "출근길 예약"}
               </button>
             </div>
           </form>

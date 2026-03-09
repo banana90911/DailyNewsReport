@@ -132,17 +132,24 @@ a {
 
 .section-title {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: 6px;
   margin: 0;
   font-size: 1.05rem;
   font-family: var(--font-display), sans-serif;
-  line-height: 1.1;
+  line-height: 1;
+}
+
+.section-title > span {
+  display: inline-flex;
+  align-items: center;
+  font: inherit;
+  line-height: 1;
 }
 
 .section-count {
   font: inherit;
-  line-height: inherit;
+  line-height: 1;
 }
 
 .section-note {

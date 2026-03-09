@@ -6,6 +6,8 @@ import { prisma } from "@/lib/db";
 import { requireApiSession } from "@/lib/route-auth";
 import { buildScheduleText, computeNextRun, validateScheduleInput } from "@/lib/schedule";
 
+const MAX_SETS_PER_USER = 3;
+
 const createSetSchema = z.object({
   mainCategory: z.string().min(1),
   mainCustom: z.string().optional(),
@@ -43,6 +45,19 @@ export async function POST(request: Request) {
   const { session, errorResponse } = await requireApiSession();
   if (errorResponse || !session) {
     return errorResponse;
+  }
+
+  const currentSetCount = await prisma.categoryScheduleSet.count({
+    where: { userId: session.user.id }
+  });
+
+  if (currentSetCount >= MAX_SETS_PER_USER) {
+    return NextResponse.json(
+      {
+        message: `출근길 일정은 최대 ${MAX_SETS_PER_USER}개까지 생성할 수 있습니다.`
+      },
+      { status: 409 }
+    );
   }
 
   const body = await request.json();
