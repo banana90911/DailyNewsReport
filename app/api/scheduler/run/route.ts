@@ -19,10 +19,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await runDueSchedules();
-  console.info("[scheduler] trigger processed", {
-    nowUtc: now.toISOString(),
-    ...result
-  });
-  return NextResponse.json(result);
+  try {
+    const result = await runDueSchedules();
+    console.info("[scheduler] trigger processed", {
+      nowUtc: now.toISOString(),
+      ...result
+    });
+    return NextResponse.json(result);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("[scheduler] trigger failed", {
+      nowUtc: now.toISOString(),
+      error: errorMessage
+    });
+    return NextResponse.json({ message: "Scheduler run failed", error: errorMessage }, { status: 500 });
+  }
 }
